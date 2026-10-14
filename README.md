@@ -2,7 +2,7 @@
 
 *[Русская версия](README.ru.md)*
 
-A Blender extension that organises **File > Import** and **File > Export** into your own named
+A Blender extension that organizes **File > Import** and **File > Export** into your own named
 groups, each shown as a submenu: "Photogrammetry", "Flat formats", "FBX for Unreal", whatever
 fits your work.
 
