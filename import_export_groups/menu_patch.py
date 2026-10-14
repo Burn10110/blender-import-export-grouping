@@ -10,8 +10,15 @@ which iterates `draw._draw_funcs`. We replace `cls.draw` with a wrapper that sha
 """
 
 import traceback
+from contextlib import contextmanager
 
 import bpy
+
+try:
+    # Private API, the same calls addon_utils uses around an add-on's register().
+    from _bpy import _bl_owner_id_get, _bl_owner_id_set
+except ImportError:  # pragma: no cover - only if Blender drops them
+    _bl_owner_id_get = _bl_owner_id_set = None
 
 MENUS = {
     "import": "TOPBAR_MT_file_import",
@@ -204,6 +211,26 @@ def _ensure_draw_funcs(menu_cls):
         menu_cls._dyn_ui_initialize()  # private Blender API; what append() itself calls
 
 
+@contextmanager
+def _no_owner():
+    """Register classes without an owner id.
+
+    Classes registered inside an add-on's register() are tagged with its module name, and
+    with workspace "Filter Add-ons" on, Blender hides a menu whose owner is not ticked
+    (`WM_menutype_poll`), group submenus included. The stock IO menus are exempt from the
+    filter, so our group submenus must be too.
+    """
+    if _bl_owner_id_set is None:
+        yield
+        return
+    previous = _bl_owner_id_get()
+    _bl_owner_id_set("")
+    try:
+        yield
+    finally:
+        _bl_owner_id_set(previous)
+
+
 def patch(config):
     """Apply `config` ({side: [{"name", "items"}]}). Safe to call again (re-applies)."""
     unpatch()
@@ -211,7 +238,8 @@ def patch(config):
         groups = [g for g in config.get(side, []) if g["items"]]
         for index, group in enumerate(groups):
             cls = _make_group_menu(side, index, group)
-            bpy.utils.register_class(cls)
+            with _no_owner():
+                bpy.utils.register_class(cls)
             _group_classes.append(cls)
 
         menu_cls = getattr(bpy.types, menu_name)

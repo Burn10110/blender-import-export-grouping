@@ -21,7 +21,7 @@ Blender **4.2 или новее** (формат extensions). Проверено 
 
 ## Установка
 
-1. Скачайте `import_export_groups-<версия>.zip` со страницы
+1. Скачайте `import-export-groups-<версия>.zip` со страницы
    [Releases](https://github.com/Burn10110/blender-import-export-grouping/releases).
 2. В Blender: **Edit > Preferences > Add-ons**, меню **⌄** справа вверху >
    **Install from Disk...**, выберите zip. Можно и просто перетащить zip в окно Blender.
@@ -79,7 +79,7 @@ Blender **4.2 или новее** (формат extensions). Проверено 
 ## Сборка из исходников
 
 ```
-blender --command extension build --source-dir import_export_groups --output-dir dist
+blender --command extension build --source-dir import_export_groups --output-filepath dist/import-export-groups-1.0.0.zip
 ```
 
 ## Лицензия

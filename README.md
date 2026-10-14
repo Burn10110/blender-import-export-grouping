@@ -21,7 +21,7 @@ Blender **4.2 or newer** (extension format). Tested on 4.5 LTS and 5.2 LTS.
 
 ## Installation
 
-1. Download `import_export_groups-<version>.zip` from the
+1. Download `import-export-groups-<version>.zip` from the
    [Releases](https://github.com/Burn10110/blender-import-export-grouping/releases) page.
 2. In Blender: **Edit > Preferences > Add-ons**, the **⌄** menu in the top right >
    **Install from Disk...**, pick the zip. Dragging the zip into the Blender window works too.
@@ -80,7 +80,7 @@ and are applied again when you re-enable it.
 ## Building from source
 
 ```
-blender --command extension build --source-dir import_export_groups --output-dir dist
+blender --command extension build --source-dir import_export_groups --output-filepath dist/import-export-groups-1.0.0.zip
 ```
 
 ## License
