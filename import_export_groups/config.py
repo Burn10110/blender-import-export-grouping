@@ -58,6 +58,27 @@ def normalize(data):
     return result
 
 
+def _read_json(path):
+    with open(path, encoding="utf-8-sig") as f:  # tolerate a BOM from hand editing
+        return json.load(f)
+
+
+def read_file(path):
+    """Read a config the user picked (Import JSON): strict, the file is never touched.
+
+    Raises OSError if it cannot be read, ValueError if it is not a groups file: that
+    would otherwise normalize to an empty config and silently wipe every group.
+    """
+    data = _read_json(path)
+    if not isinstance(data, dict) or not any(isinstance(data.get(s), list) for s in SIDES):
+        raise ValueError("not an Import/Export Groups file "
+                         f"(no {' / '.join(repr(s) for s in SIDES)} list)")
+    version = data.get("version", VERSION)
+    if isinstance(version, int) and version > VERSION:
+        raise ValueError(f"written by a newer version of the add-on (format {version})")
+    return normalize(data)
+
+
 def load(path=None):
     """Read config. Missing file -> empty config.
 
@@ -68,8 +89,7 @@ def load(path=None):
     if not os.path.exists(path):
         return empty()
     try:
-        with open(path, encoding="utf-8-sig") as f:  # tolerate a BOM from hand editing
-            data = json.load(f)
+        data = _read_json(path)
     except (OSError, ValueError) as ex:
         aside = f"{path}.corrupt-{time.strftime('%Y%m%d-%H%M%S')}"
         try:
@@ -82,14 +102,24 @@ def load(path=None):
     return normalize(data)
 
 
-def save(config, path=None):
-    """Write config atomically; the previous file is kept as `<name>.bak`."""
+def save(config, path=None, backup=True):
+    """Write config atomically; the previous file is kept as `<name>.bak`.
+
+    `backup=False` for Export JSON: the user chose the file and confirmed overwriting it.
+    """
     path = path or config_path()
     data = {"version": VERSION, **normalize(config)}
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    if os.path.exists(path):
-        shutil.copy2(path, path + ".bak")
-    os.replace(tmp, path)  # the config file itself is never missing
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        if backup and os.path.exists(path):
+            shutil.copy2(path, path + ".bak")
+        os.replace(tmp, path)  # the config file itself is never missing
+    finally:
+        if os.path.exists(tmp):  # failed half-way: no stray .tmp next to the user's file
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass

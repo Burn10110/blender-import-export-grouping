@@ -6,8 +6,10 @@ groups.json and re-patches the menus at once; there is no Save button.
 """
 
 import fnmatch
+import os
 
 import bpy
+from bpy_extras.io_utils import ExportHelper, ImportHelper
 from bpy.props import (
     BoolProperty,
     CollectionProperty,
@@ -23,6 +25,7 @@ _state = {
     "revision": 0,      # bumped on every config change
     "signature": {},    # side -> what the rows were last built from
     "building": False,  # rows are being written by us, not edited by the user
+    "filter_opened": set(),  # UIList ids whose filter field was opened this session
 }
 
 
@@ -41,7 +44,12 @@ def _apply(side, groups):
 
     Raises OSError if the file cannot be written; nothing is applied then.
     """
-    cfg = config.normalize({**_state["config"], side: groups})
+    return _apply_config({**_state["config"], side: groups})
+
+
+def _apply_config(cfg):
+    """Save `cfg` as the whole config, re-patch the menus, return the clean config."""
+    cfg = config.normalize(cfg)
     config.save(cfg)
     menu_patch.patch(cfg)
     set_config(cfg)
@@ -298,6 +306,113 @@ class IEG_MT_send_to(bpy.types.Menu):
 
 
 # ---------------------------------------------------------------------------
+# File operators
+
+def _summary(cfg):
+    return ", ".join(f"{len(cfg[side])} {side}" for side in config.SIDES) + " groups"
+
+
+class IEG_OT_export_json(bpy.types.Operator, ExportHelper):
+    bl_idname = "import_export_groups.export_json"
+    bl_label = "Export Groups"
+    bl_description = "Save all import and export groups to a JSON file"
+    bl_options = {"INTERNAL"}
+
+    filename_ext = ".json"
+    filter_glob: StringProperty(default="*.json", options={"HIDDEN"})
+
+    def invoke(self, context, event):
+        if not self.filepath:
+            self.filepath = "import_export_groups.json"
+        return super().invoke(context, event)
+
+    def execute(self, context):
+        cfg = get_config()
+        try:
+            config.save(cfg, self.filepath, backup=False)
+        except OSError as ex:
+            self.report({"ERROR"}, f"Cannot write {self.filepath}: {ex}")
+            return {"CANCELLED"}
+        self.report({"INFO"}, f"Exported {_summary(cfg)} to {self.filepath}")
+        return {"FINISHED"}
+
+
+class IEG_OT_import_json(bpy.types.Operator, ImportHelper):
+    bl_idname = "import_export_groups.import_json"
+    bl_label = "Import Groups"
+    bl_description = "Replace all import and export groups with the ones from a JSON file"
+    bl_options = {"INTERNAL"}
+
+    filename_ext = ".json"
+    filter_glob: StringProperty(default="*.json", options={"HIDDEN"})
+
+    def execute(self, context):
+        # The file browser cannot ask for confirmation itself: hand over to an operator
+        # that shows what will be replaced.
+        bpy.ops.import_export_groups.import_json_confirm("INVOKE_DEFAULT",
+                                                        filepath=self.filepath)
+        return {"FINISHED"}
+
+
+class IEG_OT_import_json_confirm(bpy.types.Operator):
+    bl_idname = "import_export_groups.import_json_confirm"
+    bl_label = "Replace All Groups"
+    bl_description = "Replace all import and export groups with the ones from a JSON file"
+    bl_options = {"INTERNAL"}
+
+    filepath: StringProperty(subtype="FILE_PATH", options={"SKIP_SAVE"})
+
+    def _read(self):
+        try:
+            return config.read_file(self.filepath)
+        except (OSError, ValueError) as ex:
+            self.report({"ERROR"}, f"Cannot import {self.filepath}: {ex}")
+            return None
+
+    def invoke(self, context, event):
+        cfg = self._read()
+        if cfg is None:
+            return {"CANCELLED"}
+        return context.window_manager.invoke_confirm(
+            self, event, title="Replace All Groups",
+            message=(f"Replace {_summary(get_config())} with {_summary(cfg)} from the file? "
+                     f"The current setup is kept as {config.FILENAME}.bak."),
+            confirm_text="Replace", icon="WARNING")
+
+    def execute(self, context):
+        cfg = self._read()  # read again: the file may have changed while the dialog was up
+        if cfg is None:
+            return {"CANCELLED"}
+        try:
+            cfg = _apply_config(cfg)
+        except OSError as ex:
+            self.report({"ERROR"}, f"Cannot save {config.FILENAME}: {ex}")
+            return {"CANCELLED"}
+        addon = context.preferences.addons.get(__package__)
+        if addon is not None:
+            # A new setup: drop the old collapse state and selection; draw rebuilds rows.
+            for side in config.SIDES:
+                rows, _, active_prop = _side_props(addon.preferences, side)
+                rows.clear()
+                setattr(addon.preferences, active_prop, 0)
+            _state["signature"].clear()
+        self.report({"INFO"}, f"Imported {_summary(cfg)}")
+        return {"FINISHED"}
+
+
+class IEG_OT_open_config_folder(bpy.types.Operator):
+    bl_idname = "import_export_groups.open_config_folder"
+    bl_label = "Open Config Folder"
+    bl_description = (f"Open the folder with {config.FILENAME} "
+                      "(and its .bak) in the file manager")
+    bl_options = {"INTERNAL"}
+
+    def execute(self, context):
+        folder = os.path.dirname(config.config_path())  # created if missing
+        return bpy.ops.wm.path_open(filepath=folder)
+
+
+# ---------------------------------------------------------------------------
 # UI
 
 class IEG_UL_entries(bpy.types.UIList):
@@ -330,6 +445,13 @@ class IEG_UL_entries(bpy.types.UIList):
         layout.row().prop(self, "filter_name", text="", icon="VIEWZOOM")
 
     def filter_items(self, context, data, propname):
+        # Filter field open by default. The Python instance is recreated on every redraw
+        # (verified 5.2.2), the flag lives in the C list: open it once per list and session,
+        # so the user can still fold it away.
+        if self.list_id not in _state["filter_opened"]:
+            _state["filter_opened"].add(self.list_id)
+            self.use_filter_show = True
+
         rows = getattr(data, propname)
         show = self.bitflag_filter_item
         if not self.filter_name:
@@ -388,6 +510,11 @@ class IEG_Preferences(bpy.types.AddonPreferences):
         col.operator(IEG_OT_move_up.bl_idname, text="", icon="TRIA_UP")
         col.operator(IEG_OT_move_down.bl_idname, text="", icon="TRIA_DOWN")
 
+        row = layout.row()
+        row.operator(IEG_OT_export_json.bl_idname, text="Export JSON...", icon="EXPORT")
+        row.operator(IEG_OT_import_json.bl_idname, text="Import JSON...", icon="IMPORT")
+        row.operator(IEG_OT_open_config_folder.bl_idname, icon="FILE_FOLDER")
+
 
 classes = (
     IEG_Row,
@@ -397,6 +524,10 @@ classes = (
     IEG_OT_move_down,
     IEG_OT_send_to,
     IEG_MT_send_to,
+    IEG_OT_export_json,
+    IEG_OT_import_json,
+    IEG_OT_import_json_confirm,
+    IEG_OT_open_config_folder,
     IEG_UL_entries,
     IEG_Preferences,
 )
