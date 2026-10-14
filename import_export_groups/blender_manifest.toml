@@ -1,0 +1,12 @@
+schema_version = "1.0.0"
+
+id = "import_export_groups"
+version = "0.1.0"
+name = "Import/Export Groups"
+tagline = "Organise File > Import and Export entries into submenus"
+maintainer = "Igor"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
