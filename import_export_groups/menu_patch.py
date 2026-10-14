@@ -9,6 +9,8 @@ which iterates `draw._draw_funcs`. We replace `cls.draw` with a wrapper that sha
 `_draw_funcs` list, so `append()` / `remove()` by other addons keep working while patched.
 """
 
+import traceback
+
 import bpy
 
 MENUS = {
@@ -152,6 +154,9 @@ def _make_group_menu(side, index, group):
     return type(idname, (bpy.types.Menu,), {
         "bl_idname": idname,
         "bl_label": group["name"],
+        # Like the stock IO menus: workspace "Filter Add-ons" must not drop IO entries.
+        # `draw_ls` reads this from `self`, which is the group menu while recording.
+        "bl_owner_use_filter": False,
         "draw": draw,
     })
 
@@ -171,16 +176,22 @@ def _make_draw(side, original, groups):
 
     def draw(self, context):
         layout = self.layout
-        if groups:
-            menu_cls = getattr(bpy.types, menu_name)
-            present = {call["idname"] for call in record(menu_cls, self, context)}
-            shown = 0
-            for group, menu_id in zip(groups, menu_ids):
-                if present.intersection(group["items"]):
-                    layout.menu(menu_id, text=group["name"])
-                    shown += 1
-            if shown:
-                layout.separator()
+        try:
+            shown = []
+            if groups:
+                menu_cls = getattr(bpy.types, menu_name)
+                present = {call["idname"] for call in record(menu_cls, self, context)}
+                shown = [(group, menu_id) for group, menu_id in zip(groups, menu_ids)
+                         if present.intersection(group["items"])]
+        except Exception:
+            # Our bug must not take File > Import / Export down: draw the stock menu.
+            traceback.print_exc()
+            original(self, context)
+            return
+        for group, menu_id in shown:
+            layout.menu(menu_id, text=group["name"])
+        if shown:
+            layout.separator()
         original(_MenuProxy(self, FilteringLayout(layout, hidden)), context)
 
     draw._draw_funcs = original._draw_funcs  # shared: later append()/remove() land here
