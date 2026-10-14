@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Igor Burn
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Patch File > Import / Export: group submenus on top, grouped entries hidden below.
 
 The menus' `draw` is Blender's `draw_ls` (see `_bpy_types._GenericUI._dyn_ui_initialize`),

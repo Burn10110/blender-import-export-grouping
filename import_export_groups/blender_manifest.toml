@@ -4,7 +4,7 @@ id = "import_export_groups"
 version = "0.1.0"
 name = "Import/Export Groups"
 tagline = "Organise File > Import and Export entries into submenus"
-maintainer = "Burn10110"
+maintainer = "Igor Burn <burnusini@gmail.com>"
 type = "add-on"
 website = "https://github.com/Burn10110/blender-import-export-grouping"
 tags = ["Import-Export", "User Interface"]
@@ -12,4 +12,4 @@ tags = ["Import-Export", "User Interface"]
 blender_version_min = "4.2.0"
 
 license = ["SPDX:GPL-3.0-or-later"]
-copyright = ["2026 Burn10110"]
+copyright = ["2026 Igor Burn"]

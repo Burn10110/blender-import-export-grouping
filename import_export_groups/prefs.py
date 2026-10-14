@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Igor Burn
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Add-on preferences: one tab per menu, groups and entries shown as a tree in a UIList.
 
 The rows are a working copy (D8): rebuilt from the config + live menu discovery whenever

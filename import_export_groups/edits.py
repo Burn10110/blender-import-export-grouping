@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Igor Burn
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Edits of one menu side's groups, behind the preference buttons.
 
 Pure functions on plain data: each takes `groups` ([{"name", "items"}], never modified) and

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Igor Burn
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Discover the entries of File > Import / Export as the user sees them.
 
 Each draw function of the menu is run against a RecordingLayout. Owner filtering of the

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Igor Burn
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Group config: JSON file in the extension's user directory.
 
 Format:
